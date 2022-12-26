@@ -1,6 +1,8 @@
 [workspace]
 members = [
+  "crates/unknown/lang/reader/lexer",
   "crates/unknown/lang/reader/syntax",
+  "crates/unknown/lang/reader/token",
 ]
 
 
