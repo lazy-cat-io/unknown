@@ -1,0 +1,65 @@
+{:min-bb-version "1.0.168"
+
+ :tasks
+ {:requires ([clojure.string :as str])
+
+  :init (do
+          (def crates
+            ["unknown-lexer"
+             "unknown-syntax"
+             "unknown-token"]))
+
+  :enter (let [{:keys [doc print-doc?]
+                :or   {print-doc? true}} (current-task)]
+           (when (and print-doc? doc)
+             (println (format "\n▸ %s \n" doc))))
+
+  crate:api {:doc "Show the crate API"
+             :task (let [available-crates (set crates)
+                         crate (first *command-line-args*)]
+                     (if (contains? available-crates crate)
+                       (shell (format "cargo modules generate tree --package %s --lib --with-types --with-tests --with-orphans" crate))
+                       (do
+                         (println "Available crates:")
+                         (doseq [crate crates]
+                           (println (format " * %s" crate))))))}
+
+  deps:graph {:doc "Show the dependencies graph"
+              ;; FIXME: [2022-12-27, Ilshat Sultanov] pipe doesn't work
+              :task (println "cargo depgraph --all-deps | dot -Tsvg > graph.svg")}
+
+  deps:check {:doc "Check deps updates"
+              :task (shell "cargo update --dry-run")}
+
+  deps:update {:doc "Update deps"
+               :task (shell "cargo update")}
+
+  lint:clippy {:doc "Run clippy"
+               :task (shell "cargo clippy")}
+
+  lint:fmt {:doc "Run fmt"
+            :task (shell "cargo fmt --all --check")}
+
+  lint {:doc "Run linters"
+        :task (do
+                (run 'lint:fmt)
+                (run 'lint:clippy))}
+
+  clean {:doc "Run cleanup"
+         :task (shell "cargo clean")}
+
+  test {:doc "Run tests"
+        :task (shell "cargo test")}
+
+  build {:doc "Run build"
+         :task (shell "cargo build --release")}
+
+  run {:doc "Run release"
+       :task (shell "cargo run --release")}
+
+  all {:doc "Run cleanup, linters, tests and build"
+       :task (do
+               (run 'clean)
+               (run 'lint)
+               (run 'test)
+               (run 'build))}}}
