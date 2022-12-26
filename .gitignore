@@ -1,1 +1,6 @@
+# cargo output
 target
+
+# deps:graph task output
+graph.dot
+graph.svg
