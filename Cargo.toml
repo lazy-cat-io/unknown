@@ -1,5 +1,7 @@
 [workspace]
-members = []
+members = [
+  "crates/unknown/lang/reader/syntax",
+]
 
 
 [profile.release]

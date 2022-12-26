@@ -1,0 +1,24 @@
+[package]
+name = "unknown-syntax"
+description = ""
+version = "0.0.0-alpha"
+
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+authors = ["Ilshat Sultanov <ilshat@sultanov.team>"]
+homepage = "https://github.com/lazy-cat-io/unknown"
+repository = "https://github.com/lazy-cat-io/unknown"
+categories = []
+
+edition = "2021"
+rust-version = "1.66"
+exclude = []
+
+
+[dependencies]
+eventree = "0.6.2"
+
+
+[dev-dependencies]
+clippy = "0.0.302"
