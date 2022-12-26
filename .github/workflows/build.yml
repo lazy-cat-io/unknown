@@ -1,0 +1,90 @@
+name: build
+
+
+on:
+  push:
+    branches:
+      - main 
+      - develop
+  pull_request:
+    branches:
+      - main
+      - develop
+
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable 
+
+      - name: Check
+        uses: actions-rs/cargo@v1
+        with:
+          command: fmt
+          args: --all -- --check
+
+
+  test:
+    needs: lint
+
+    strategy:
+      fail-fast: false
+      matrix:
+        rust_version: [stable]
+        platform:
+          - { id: windows, target: x86_64-pc-windows-msvc, os: windows-latest }
+          - { id: ubuntu, target: x86_64-unknown-linux-gnu, os: ubuntu-latest }
+          - { id: macos, target: x86_64-apple-darwin, os: macos-latest }
+
+    env:
+      RUST_BACKTRACE: 1
+      CARGO_INCREMENTAL: 0
+      RUSTFLAGS: "-C debuginfo=0"
+      OPTIONS: ${{ matrix.platform.options }}
+      FEATURES: ${{ format(',{0}', matrix.platform.features ) }}
+      CMD: ${{ matrix.platform.cmd }}
+
+    runs-on: ${{ matrix.platform.os }}
+
+    steps:
+      - name: Checkout 
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Cache deps 
+        uses: actions/cache@v3
+        with:
+          path: ~/.cargo
+          key: ${{ matrix.platform.target }}-cargo-${{ matrix.rust_version }}
+
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          target: ${{ matrix.platform.target }}
+          toolchain: ${{ matrix.rust_version }}
+
+      - name: Check docs
+        shell: bash
+        run: cargo $CMD doc --no-deps --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
+
+      - name: Build
+        shell: bash
+        run: cargo $CMD build --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
+
+      - name: Build tests
+        shell: bash
+        run: cargo $CMD test --no-run --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
+
+      - name: Run tests
+        shell: bash
+        run: cargo $CMD test --verbose --target ${{ matrix.platform.target }} $OPTIONS --features $FEATURES
