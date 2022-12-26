@@ -40,6 +40,9 @@ enum LexerTokenKind {
     #[token(",")]
     Comma,
 
+    #[token("nil")]
+    Nil,
+
     #[regex("true|false")]
     Boolean,
 
@@ -73,6 +76,16 @@ mod tests {
             ",",
             expect![[r#"
                 Comma@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_nil() {
+        check(
+            "nil",
+            expect![[r#"
+                Nil@0..3
             "#]],
         );
     }
