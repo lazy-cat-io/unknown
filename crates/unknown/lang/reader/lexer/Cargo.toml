@@ -1,0 +1,28 @@
+[package]
+name = "unknown-lexer"
+description = ""
+version = "0.0.0-alpha"
+
+license = "MIT OR Apache-2.0"
+readme = "README.md"
+
+authors = ["Ilshat Sultanov <ilshat@sultanov.team>"]
+homepage = "https://github.com/lazy-cat-io/unknown"
+repository = "https://github.com/lazy-cat-io/unknown"
+categories = []
+
+edition = "2021"
+rust-version = "1.66"
+exclude = []
+
+
+[dependencies]
+logos = "0.12.1"
+text-size = "1.1.0"
+unknown-syntax = { path = "../syntax" }
+unknown-token = { path = "../token" }
+
+
+[dev-dependencies]
+clippy = "0.0.302"
+expect-test = "1.4.0"
