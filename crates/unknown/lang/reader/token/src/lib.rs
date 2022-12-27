@@ -1,4 +1,5 @@
 use std::fmt;
+
 use text_size::{TextRange, TextSize};
 
 use unknown_syntax::TokenKind;
