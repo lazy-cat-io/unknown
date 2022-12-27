@@ -6,35 +6,6 @@ use text_size::TextSize;
 use unknown_syntax::TokenKind;
 use unknown_token::Tokens;
 
-pub fn lex(text: &str) -> Tokens {
-    let mut kinds = Vec::new();
-    let mut starts = Vec::new();
-
-    let mut lexer = LexerTokenKind::lexer(text);
-    while let Some(kind) = lexer.next() {
-        let range = lexer.span();
-        let start = (range.start as u32).into();
-
-        let mut handler = |k, s| {
-            kinds.push(k);
-            starts.push(s);
-        };
-
-        match kind {
-            LexerTokenKind::__InternalString => lex_string(lexer.slice(), start, handler),
-            LexerTokenKind::__InternalComment => lex_comment(start, range.len(), handler),
-            _ => handler(unsafe { mem::transmute(kind) }, start),
-        }
-    }
-
-    starts.push((text.len() as u32).into());
-
-    kinds.shrink_to_fit();
-    starts.shrink_to_fit();
-
-    Tokens::new(kinds, starts)
-}
-
 #[derive(PartialEq, Logos)]
 enum LexerTokenKind {
     // TODO: [2022-12-27, Ilshat Sultanov] handle other whitespace characters
@@ -85,12 +56,33 @@ enum LexerTokenKind {
     Error,
 }
 
-fn lex_comment(offset: TextSize, len: usize, mut f: impl FnMut(TokenKind, TextSize)) {
-    f(TokenKind::CommentLeader, offset);
+pub fn lex(text: &str) -> Tokens {
+    let mut kinds = Vec::new();
+    let mut starts = Vec::new();
 
-    if len > 1 {
-        f(TokenKind::CommentContent, offset + TextSize::from(1));
+    let mut lexer = LexerTokenKind::lexer(text);
+    while let Some(kind) = lexer.next() {
+        let range = lexer.span();
+        let start = (range.start as u32).into();
+
+        let mut handler = |k, s| {
+            kinds.push(k);
+            starts.push(s);
+        };
+
+        match kind {
+            LexerTokenKind::__InternalString => lex_string(lexer.slice(), start, handler),
+            LexerTokenKind::__InternalComment => lex_comment(start, range.len(), handler),
+            _ => handler(unsafe { mem::transmute(kind) }, start),
+        }
     }
+
+    starts.push((text.len() as u32).into());
+
+    kinds.shrink_to_fit();
+    starts.shrink_to_fit();
+
+    Tokens::new(kinds, starts)
 }
 
 fn lex_string(s: &str, offset: TextSize, mut f: impl FnMut(TokenKind, TextSize)) {
@@ -123,6 +115,14 @@ fn lex_string(s: &str, offset: TextSize, mut f: impl FnMut(TokenKind, TextSize))
         }
 
         pos += TextSize::from(c.len_utf8() as u32);
+    }
+}
+
+fn lex_comment(offset: TextSize, len: usize, mut f: impl FnMut(TokenKind, TextSize)) {
+    f(TokenKind::CommentLeader, offset);
+
+    if len > 1 {
+        f(TokenKind::CommentContent, offset + TextSize::from(1));
     }
 }
 
