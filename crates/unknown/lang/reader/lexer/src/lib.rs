@@ -21,6 +21,7 @@ pub fn lex(text: &str) -> Tokens {
         };
 
         match kind {
+            LexerTokenKind::__InternalString => lex_string(lexer.slice(), start, handler),
             LexerTokenKind::__InternalComment => lex_comment(start, range.len(), handler),
             _ => handler(unsafe { mem::transmute(kind) }, start),
         }
@@ -55,6 +56,13 @@ enum LexerTokenKind {
     #[regex(";.*")]
     __InternalComment,
 
+    _Quote,
+    _Escape,
+    _StringContents,
+
+    #[regex(r#""([^"\\\n]|\\.)*"?"#)]
+    __InternalString,
+
     #[error]
     Error,
 }
@@ -64,6 +72,39 @@ fn lex_comment(offset: TextSize, len: usize, mut f: impl FnMut(TokenKind, TextSi
 
     if len > 1 {
         f(TokenKind::CommentContent, offset + TextSize::from(1));
+    }
+}
+
+fn lex_string(s: &str, offset: TextSize, mut f: impl FnMut(TokenKind, TextSize)) {
+    #[derive(Clone, Copy)]
+    enum Mode {
+        StartContent,
+        InContent,
+        Escape,
+    }
+
+    let mut mode = Mode::InContent;
+    let mut pos = offset;
+
+    for c in s.chars() {
+        match (mode, c) {
+            (Mode::InContent | Mode::StartContent, '"') => {
+                mode = Mode::StartContent;
+                f(TokenKind::Quote, pos);
+            }
+            (Mode::InContent | Mode::StartContent, '\\') => {
+                mode = Mode::Escape;
+                f(TokenKind::Escape, pos);
+            }
+            (Mode::StartContent, _) => {
+                mode = Mode::InContent;
+                f(TokenKind::StringContent, pos);
+            }
+            (Mode::InContent, _) => {}
+            (Mode::Escape, _) => mode = Mode::StartContent,
+        }
+
+        pos += TextSize::from(c.len_utf8() as u32);
     }
 }
 
@@ -123,6 +164,29 @@ mod tests {
             "false",
             expect![[r#"
                 Boolean@0..5
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_empty_string() {
+        check(
+            "\"\"",
+            expect![[r#"
+                Quote@0..1
+                Quote@1..2
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_string() {
+        check(
+            "\"hello, world!\"",
+            expect![[r#"
+                Quote@0..1
+                StringContent@1..14
+                Quote@14..15
             "#]],
         );
     }

@@ -21,6 +21,9 @@ pub enum TokenKind {
     Comma,
     Nil,
     Boolean,
+    Quote,
+    Escape,
+    StringContent,
     CommentLeader,
     CommentContent,
     Error,
@@ -30,6 +33,7 @@ pub enum TokenKind {
 pub enum NodeKind {
     Root,
     Comment,
+    String,
     Error,
 }
 
