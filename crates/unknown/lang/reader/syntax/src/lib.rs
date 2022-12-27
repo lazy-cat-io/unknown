@@ -19,6 +19,8 @@ impl eventree::TreeConfig for TreeConfig {
 pub enum TokenKind {
     Whitespace,
     Comma,
+    LeftParenthesis,
+    RightParenthesis,
     Nil,
     Boolean,
     Quote,

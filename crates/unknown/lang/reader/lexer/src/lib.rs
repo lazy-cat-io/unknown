@@ -44,6 +44,12 @@ enum LexerTokenKind {
     #[token(",")]
     Comma,
 
+    #[token("(")]
+    LeftParenthesis,
+
+    #[token(")")]
+    RightParenthesis,
+
     #[token("nil")]
     Nil,
 
@@ -134,6 +140,26 @@ mod tests {
             ",",
             expect![[r#"
                 Comma@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_left_parenthesis() {
+        check(
+            "(",
+            expect![[r#"
+                LeftParenthesis@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_right_parenthesis() {
+        check(
+            ")",
+            expect![[r#"
+                RightParenthesis@0..1
             "#]],
         );
     }
