@@ -21,12 +21,15 @@ pub enum TokenKind {
     Comma,
     Nil,
     Boolean,
+    CommentLeader,
+    CommentContent,
     Error,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NodeKind {
     Root,
+    Comment,
     Error,
 }
 

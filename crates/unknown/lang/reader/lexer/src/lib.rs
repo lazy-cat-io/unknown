@@ -1,6 +1,9 @@
-use logos::Logos;
 use std::mem;
 
+use logos::Logos;
+use text_size::TextSize;
+
+use unknown_syntax::TokenKind;
 use unknown_token::Tokens;
 
 pub fn lex(text: &str) -> Tokens {
@@ -17,8 +20,8 @@ pub fn lex(text: &str) -> Tokens {
             starts.push(s);
         };
 
-        #[allow(clippy::match_single_binding)]
         match kind {
+            LexerTokenKind::__InternalComment => lex_comment(start, range.len(), handler),
             _ => handler(unsafe { mem::transmute(kind) }, start),
         }
     }
@@ -46,8 +49,22 @@ enum LexerTokenKind {
     #[regex("true|false")]
     Boolean,
 
+    _CommentLeader,
+    _CommentContent,
+
+    #[regex(";.*")]
+    __InternalComment,
+
     #[error]
     Error,
+}
+
+fn lex_comment(offset: TextSize, len: usize, mut f: impl FnMut(TokenKind, TextSize)) {
+    f(TokenKind::CommentLeader, offset);
+
+    if len > 1 {
+        f(TokenKind::CommentContent, offset + TextSize::from(1));
+    }
 }
 
 #[cfg(test)]
@@ -106,6 +123,60 @@ mod tests {
             "false",
             expect![[r#"
                 Boolean@0..5
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_empty_comment() {
+        check(
+            ";",
+            expect![[r#"
+                CommentLeader@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_comment_column() {
+        check(
+            "; comment column",
+            expect![[r#"
+                CommentLeader@0..1
+                CommentContent@1..16
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_comment_form() {
+        check(
+            ";; comment form",
+            expect![[r#"
+                CommentLeader@0..1
+                CommentContent@1..15
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_comment_definition() {
+        check(
+            ";;; comment definition",
+            expect![[r#"
+                CommentLeader@0..1
+                CommentContent@1..22
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_comment_header_or_footer() {
+        check(
+            ";;;; comment header/footer",
+            expect![[r#"
+                CommentLeader@0..1
+                CommentContent@1..26
             "#]],
         );
     }
