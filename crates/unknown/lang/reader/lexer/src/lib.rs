@@ -50,6 +50,12 @@ enum LexerTokenKind {
     #[token(")")]
     RightParenthesis,
 
+    #[token("[")]
+    LeftBracket,
+
+    #[token("]")]
+    RightBracket,
+
     #[token("{")]
     LeftBrace,
 
@@ -166,6 +172,26 @@ mod tests {
             ")",
             expect![[r#"
                 RightParenthesis@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_left_bracket() {
+        check(
+            "[",
+            expect![[r#"
+                LeftBracket@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_right_bracket() {
+        check(
+            "]",
+            expect![[r#"
+                RightBracket@0..1
             "#]],
         );
     }

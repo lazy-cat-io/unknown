@@ -21,6 +21,8 @@ pub enum TokenKind {
     Comma,
     LeftParenthesis,
     RightParenthesis,
+    LeftBracket,
+    RightBracket,
     LeftBrace,
     RightBrace,
     Nil,
