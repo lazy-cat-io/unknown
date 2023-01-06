@@ -26,6 +26,14 @@ pub enum TokenKind {
     Keyword,
 
     Whitespace,
+    Hash,
+    LeftParenthesis,
+    RightParenthesis,
+    LeftBracket,
+    RightBracket,
+    LeftBrace,
+    RightBrace,
+
     SingleQuote,
     DoubleQuote,
     Escape,
@@ -43,6 +51,10 @@ pub enum NodeKind {
     Root,
     Comment,
     String,
+    List,
+    Vector,
+    Map,
+    Set,
     Error,
 }
 

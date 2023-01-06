@@ -33,6 +33,27 @@ enum LexerTokenKind {
     #[regex(r#"[ ,\n]+"#)]
     Whitespace,
 
+    #[token("#")]
+    Hash,
+
+    #[token("(")]
+    LeftParenthesis,
+
+    #[token(")")]
+    RightParenthesis,
+
+    #[token("[")]
+    LeftBracket,
+
+    #[token("]")]
+    RightBracket,
+
+    #[token("{")]
+    LeftBrace,
+
+    #[token("}")]
+    RightBrace,
+
     _SingleQuote,
     _DoubleQuote,
     _Escape,
@@ -298,6 +319,76 @@ mod tests {
             "  \n , ",
             expect![[r#"
                 Whitespace@0..6
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_hash() {
+        check(
+            "#",
+            expect![[r#"
+                Hash@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_left_parenthesis() {
+        check(
+            "(",
+            expect![[r#"
+                LeftParenthesis@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_right_parenthesis() {
+        check(
+            ")",
+            expect![[r#"
+                RightParenthesis@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_left_bracket() {
+        check(
+            "[",
+            expect![[r#"
+                LeftBracket@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_right_bracket() {
+        check(
+            "]",
+            expect![[r#"
+                RightBracket@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_left_brace() {
+        check(
+            "{",
+            expect![[r#"
+                LeftBrace@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_right_brace() {
+        check(
+            "}",
+            expect![[r#"
+                RightBrace@0..1
             "#]],
         );
     }
