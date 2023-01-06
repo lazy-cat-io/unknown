@@ -8,49 +8,46 @@ use unknown_token::Tokens;
 
 #[derive(PartialEq, Logos)]
 enum LexerTokenKind {
-    // TODO: [2022-12-27, Ilshat Sultanov] handle other whitespace characters
-    #[regex("[ ,\n]+")]
-    Whitespace,
-
-    #[token(",")]
-    Comma,
-
-    #[token("(")]
-    LeftParenthesis,
-
-    #[token(")")]
-    RightParenthesis,
-
-    #[token("[")]
-    LeftBracket,
-
-    #[token("]")]
-    RightBracket,
-
-    #[token("{")]
-    LeftBrace,
-
-    #[token("}")]
-    RightBrace,
-
     #[token("nil")]
     Nil,
 
-    #[regex("true|false")]
+    #[regex(r#"true|false"#)]
     Boolean,
 
-    _CommentLeader,
-    _CommentContent,
+    #[regex(r#"-?[0-9]+"#)]
+    Integer,
 
-    #[regex(";.*")]
-    __InternalComment,
+    #[regex(r#"-?[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+"#)]
+    Float,
 
-    _Quote,
+    #[regex(r#"([-+]?[0-9]+)/([0-9]+)"#)]
+    Ratio,
+
+    // TODO: [2022-12-27, Ilshat Sultanov] handle other whitespace characters
+    #[regex(r#"[ ,\n]+"#)]
+    Whitespace,
+
+    _SingleQuote,
+    _DoubleQuote,
     _Escape,
-    _StringContents,
+    _StringContent,
 
     #[regex(r#""([^"\\\n]|\\.)*"?"#)]
-    __InternalString,
+    __String,
+
+    _CommentContent,
+
+    #[regex(r#";;;;.*"#)]
+    __CommentHeader,
+
+    #[regex(r#";;;.*"#)]
+    __CommentDefinition,
+
+    #[regex(r#";;.*"#)]
+    __CommentForm,
+
+    #[regex(r#";.*"#)]
+    __CommentLine,
 
     #[error]
     Error,
@@ -71,8 +68,13 @@ pub fn lex(text: &str) -> Tokens {
         };
 
         match kind {
-            LexerTokenKind::__InternalString => lex_string(lexer.slice(), start, handler),
-            LexerTokenKind::__InternalComment => lex_comment(start, range.len(), handler),
+            LexerTokenKind::__String => lex_string(lexer.slice(), start, handler),
+            LexerTokenKind::__CommentHeader => lex_comment_header(start, range.len(), handler),
+            LexerTokenKind::__CommentDefinition => {
+                lex_comment_definition(start, range.len(), handler)
+            }
+            LexerTokenKind::__CommentForm => lex_comment_form(start, range.len(), handler),
+            LexerTokenKind::__CommentLine => lex_comment_line(start, range.len(), handler),
             _ => handler(unsafe { mem::transmute(kind) }, start),
         }
     }
@@ -89,28 +91,28 @@ fn lex_string(s: &str, offset: TextSize, mut f: impl FnMut(TokenKind, TextSize))
     #[derive(Clone, Copy)]
     enum Mode {
         StartContent,
-        InContent,
+        InternalContent,
         Escape,
     }
 
-    let mut mode = Mode::InContent;
+    let mut mode = Mode::InternalContent;
     let mut pos = offset;
 
     for c in s.chars() {
         match (mode, c) {
-            (Mode::InContent | Mode::StartContent, '"') => {
+            (Mode::InternalContent | Mode::StartContent, '"') => {
                 mode = Mode::StartContent;
-                f(TokenKind::Quote, pos);
+                f(TokenKind::DoubleQuote, pos);
             }
-            (Mode::InContent | Mode::StartContent, '\\') => {
+            (Mode::InternalContent | Mode::StartContent, '\\') => {
                 mode = Mode::Escape;
                 f(TokenKind::Escape, pos);
             }
             (Mode::StartContent, _) => {
-                mode = Mode::InContent;
+                mode = Mode::InternalContent;
                 f(TokenKind::StringContent, pos);
             }
-            (Mode::InContent, _) => {}
+            (Mode::InternalContent, _) => {}
             (Mode::Escape, _) => mode = Mode::StartContent,
         }
 
@@ -118,10 +120,38 @@ fn lex_string(s: &str, offset: TextSize, mut f: impl FnMut(TokenKind, TextSize))
     }
 }
 
-fn lex_comment(offset: TextSize, len: usize, mut f: impl FnMut(TokenKind, TextSize)) {
-    f(TokenKind::CommentLeader, offset);
+fn lex_comment_header(offset: TextSize, length: usize, mut f: impl FnMut(TokenKind, TextSize)) {
+    f(TokenKind::CommentHeader, offset);
 
-    if len > 1 {
+    if length > 4 {
+        f(TokenKind::CommentContent, offset + TextSize::from(4));
+    }
+}
+
+fn lex_comment_definition(
+    offset: TextSize,
+    length: usize,
+    mut f: impl FnMut(TokenKind, TextSize),
+) {
+    f(TokenKind::CommentDefinition, offset);
+
+    if length > 3 {
+        f(TokenKind::CommentContent, offset + TextSize::from(3));
+    }
+}
+
+fn lex_comment_form(offset: TextSize, length: usize, mut f: impl FnMut(TokenKind, TextSize)) {
+    f(TokenKind::CommentForm, offset);
+
+    if length > 2 {
+        f(TokenKind::CommentContent, offset + TextSize::from(2));
+    }
+}
+
+fn lex_comment_line(offset: TextSize, length: usize, mut f: impl FnMut(TokenKind, TextSize)) {
+    f(TokenKind::CommentLine, offset);
+
+    if length > 1 {
         f(TokenKind::CommentContent, offset + TextSize::from(1));
     }
 }
@@ -134,86 +164,6 @@ mod tests {
     fn check(input: &str, expect: Expect) {
         let tokens = lex(input);
         expect.assert_debug_eq(&tokens);
-    }
-
-    #[test]
-    fn lex_whitespace() {
-        check(
-            "  \n , ",
-            expect![[r#"
-                Whitespace@0..6
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_comma() {
-        check(
-            ",",
-            expect![[r#"
-                Comma@0..1
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_left_parenthesis() {
-        check(
-            "(",
-            expect![[r#"
-                LeftParenthesis@0..1
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_right_parenthesis() {
-        check(
-            ")",
-            expect![[r#"
-                RightParenthesis@0..1
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_left_bracket() {
-        check(
-            "[",
-            expect![[r#"
-                LeftBracket@0..1
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_right_bracket() {
-        check(
-            "]",
-            expect![[r#"
-                RightBracket@0..1
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_left_brace() {
-        check(
-            "{",
-            expect![[r#"
-                LeftBrace@0..1
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_right_brace() {
-        check(
-            "}",
-            expect![[r#"
-                RightBrace@0..1
-            "#]],
-        );
     }
 
     #[test]
@@ -247,12 +197,72 @@ mod tests {
     }
 
     #[test]
+    fn lex_integer() {
+        check(
+            "42",
+            expect![[r#"
+                Integer@0..2
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_integer_negative() {
+        check(
+            "-42",
+            expect![[r#"
+                Integer@0..3
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_float() {
+        check(
+            "42.0",
+            expect![[r#"
+                Float@0..4
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_float_negative() {
+        check(
+            "-42.0",
+            expect![[r#"
+                Float@0..5
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_ratio() {
+        check(
+            "42/42",
+            expect![[r#"
+                Ratio@0..5
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_whitespace() {
+        check(
+            "  \n , ",
+            expect![[r#"
+                Whitespace@0..6
+            "#]],
+        );
+    }
+
+    #[test]
     fn lex_empty_string() {
         check(
             "\"\"",
             expect![[r#"
-                Quote@0..1
-                Quote@1..2
+                DoubleQuote@0..1
+                DoubleQuote@1..2
             "#]],
         );
     }
@@ -262,9 +272,9 @@ mod tests {
         check(
             "\"hello, world!\"",
             expect![[r#"
-                Quote@0..1
+                DoubleQuote@0..1
                 StringContent@1..14
-                Quote@14..15
+                DoubleQuote@14..15
             "#]],
         );
     }
@@ -274,18 +284,18 @@ mod tests {
         check(
             ";",
             expect![[r#"
-                CommentLeader@0..1
+                CommentLine@0..1
             "#]],
         );
     }
 
     #[test]
-    fn lex_comment_column() {
+    fn lex_comment_line() {
         check(
-            "; comment column",
+            "; comment line",
             expect![[r#"
-                CommentLeader@0..1
-                CommentContent@1..16
+                CommentLine@0..1
+                CommentContent@1..14
             "#]],
         );
     }
@@ -295,8 +305,8 @@ mod tests {
         check(
             ";; comment form",
             expect![[r#"
-                CommentLeader@0..1
-                CommentContent@1..15
+                CommentForm@0..2
+                CommentContent@2..15
             "#]],
         );
     }
@@ -306,8 +316,8 @@ mod tests {
         check(
             ";;; comment definition",
             expect![[r#"
-                CommentLeader@0..1
-                CommentContent@1..22
+                CommentDefinition@0..3
+                CommentContent@3..22
             "#]],
         );
     }
@@ -315,10 +325,10 @@ mod tests {
     #[test]
     fn lex_comment_header_or_footer() {
         check(
-            ";;;; comment header/footer",
+            ";;;; comment header or footer",
             expect![[r#"
-                CommentLeader@0..1
-                CommentContent@1..26
+                CommentHeader@0..4
+                CommentContent@4..29
             "#]],
         );
     }

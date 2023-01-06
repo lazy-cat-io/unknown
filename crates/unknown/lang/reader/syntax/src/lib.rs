@@ -17,21 +17,22 @@ impl eventree::TreeConfig for TreeConfig {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum TokenKind {
-    Whitespace,
-    Comma,
-    LeftParenthesis,
-    RightParenthesis,
-    LeftBracket,
-    RightBracket,
-    LeftBrace,
-    RightBrace,
     Nil,
     Boolean,
-    Quote,
+    Integer,
+    Float,
+    Ratio,
+
+    Whitespace,
+    SingleQuote,
+    DoubleQuote,
     Escape,
     StringContent,
-    CommentLeader,
     CommentContent,
+    CommentHeader,
+    CommentDefinition,
+    CommentForm,
+    CommentLine,
     Error,
 }
 
