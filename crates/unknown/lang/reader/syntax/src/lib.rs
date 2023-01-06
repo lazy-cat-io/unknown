@@ -22,10 +22,11 @@ pub enum TokenKind {
     Integer,
     Float,
     Ratio,
-    Symbol,
-    Keyword,
+    Character,
+    Identifier,
 
     Whitespace,
+    Colon,
     Hash,
     LeftParenthesis,
     RightParenthesis,
@@ -49,12 +50,22 @@ pub enum TokenKind {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum NodeKind {
     Root,
-    Comment,
+    Nil,
+    Boolean,
+    Integer,
+    Float,
+    Ratio,
+    Character,
     String,
+    Symbol,
+    Keyword,
+
     List,
     Vector,
     Map,
     Set,
+
+    Comment,
     Error,
 }
 

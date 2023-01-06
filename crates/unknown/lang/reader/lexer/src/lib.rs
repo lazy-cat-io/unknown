@@ -14,24 +14,32 @@ enum LexerTokenKind {
     #[regex(r#"true|false"#)]
     Boolean,
 
+    // TODO: [2023-01-06, Ilshat Sultanov] handle 2r101010, 052, 8r52, 0x2a, 36r16, and 42
     #[regex(r#"-?[0-9]+"#)]
     Integer,
 
+    // TODO: [2023-01-06, Ilshat Sultanov] handle `M` suffix to support BigDecimals
     #[regex(r#"-?[0-9]+\.[0-9]+([eE][+-]?[0-9]+)?|[0-9]+[eE][+-]?[0-9]+"#)]
     Float,
 
     #[regex(r#"([-+]?[0-9]+)/([0-9]+)"#)]
     Ratio,
 
-    #[regex("[a-zA-Z_]+[/a-zA-Z0-9_]*")]
-    Symbol,
+    // TODO: [2023-01-06, Ilshat Sultanov] handle other cases
+    #[regex(r#"\\(newline|space|tab|backspace|formfeed|return|.)"#)]
+    #[regex(r#"\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]"#)]
+    #[regex(r#"\\o([0-7]|([0-7][0-7])|([0-3][0-7][0-7]))"#)]
+    Character,
 
-    #[regex(":[a-zA-Z_]+[/a-zA-Z0-9_]*")]
-    Keyword,
+    #[regex("[a-zA-Z._+]+[/a-zA-Z0-9._+]*")]
+    Identifier,
 
     // TODO: [2022-12-27, Ilshat Sultanov] handle other whitespace characters
     #[regex(r#"[ ,\n]+"#)]
     Whitespace,
+
+    #[token(":")]
+    Colon,
 
     #[token("#")]
     Hash,
@@ -54,7 +62,9 @@ enum LexerTokenKind {
     #[token("}")]
     RightBrace,
 
-    _SingleQuote,
+    #[token("'")]
+    SingleQuote,
+
     _DoubleQuote,
     _Escape,
     _StringContent,
@@ -278,7 +288,7 @@ mod tests {
         check(
             "foobar",
             expect![[r#"
-                Symbol@0..6
+                Identifier@0..6
             "#]],
         );
     }
@@ -288,27 +298,7 @@ mod tests {
         check(
             "foobar/baz",
             expect![[r#"
-                Symbol@0..10
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_keyword() {
-        check(
-            ":foobar",
-            expect![[r#"
-                Keyword@0..7
-            "#]],
-        );
-    }
-
-    #[test]
-    fn lex_keyword_qualified() {
-        check(
-            ":foobar/baz",
-            expect![[r#"
-                Keyword@0..11
+                Identifier@0..10
             "#]],
         );
     }
@@ -323,6 +313,15 @@ mod tests {
         );
     }
 
+    #[test]
+    fn lex_colon() {
+        check(
+            ":",
+            expect![[r#"
+                Colon@0..1
+            "#]],
+        );
+    }
     #[test]
     fn lex_hash() {
         check(
@@ -466,6 +465,280 @@ mod tests {
             expect![[r#"
                 CommentHeader@0..4
                 CommentContent@4..29
+            "#]],
+        );
+    }
+
+    // Clojure syntax
+
+    #[test]
+    fn lex_numeric_types() {
+        check(
+            "42",
+            expect![[r#"
+                Integer@0..2
+            "#]],
+        );
+
+        check(
+            "-1.5",
+            expect![[r#"
+                Float@0..4
+            "#]],
+        );
+
+        check(
+            "22/7",
+            expect![[r#"
+                Ratio@0..4
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_character_types() {
+        check(
+            "\\e",
+            expect![[r#"
+                Character@0..2
+            "#]],
+        );
+
+        check(
+            "\\newline",
+            expect![[r#"
+                Character@0..8
+            "#]],
+        );
+
+        check(
+            "\\u0041",
+            expect![[r#"
+                Character@0..6
+            "#]],
+        );
+
+        check(
+            "\\u005A",
+            expect![[r#"
+                Character@0..6
+            "#]],
+        );
+
+        check(
+            "\\o256",
+            expect![[r#"
+                Character@0..5
+            "#]],
+        );
+
+        check(
+            "\"\"",
+            expect![[r#"
+                DoubleQuote@0..1
+                DoubleQuote@1..2
+            "#]],
+        );
+
+        check(
+            "\"hello\"",
+            expect![[r#"
+                DoubleQuote@0..1
+                StringContent@1..6
+                DoubleQuote@6..7
+            "#]],
+        );
+
+        check(
+            "\"\"",
+            expect![[r#"
+                DoubleQuote@0..1
+                DoubleQuote@1..2
+            "#]],
+        );
+
+        check(
+            "#\"[0-9]+\"",
+            expect![[r#"
+                Hash@0..1
+                DoubleQuote@1..2
+                StringContent@2..8
+                DoubleQuote@8..9
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_symbols_and_idents() {
+        check(
+            "map",
+            expect![[r#"
+                Identifier@0..3
+            "#]],
+        );
+
+        check(
+            "+",
+            expect![[r#"
+                Identifier@0..1
+            "#]],
+        );
+
+        check(
+            "clojure.core/+",
+            expect![[r#"
+                Identifier@0..14
+            "#]],
+        );
+
+        check(
+            "nil",
+            expect![[r#"
+                Nil@0..3
+            "#]],
+        );
+
+        check(
+            "true false",
+            expect![[r#"
+                Boolean@0..4
+                Whitespace@4..5
+                Boolean@5..10
+            "#]],
+        );
+
+        check(
+            ":alpha",
+            expect![[r#"
+                Colon@0..1
+                Identifier@1..6
+            "#]],
+        );
+
+        check(
+            ":release/alpha",
+            expect![[r#"
+                Colon@0..1
+                Identifier@1..14
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_literal_collections() {
+        check(
+            "'(1 2 3)",
+            expect![[r#"
+                SingleQuote@0..1
+                LeftParenthesis@1..2
+                Integer@2..3
+                Whitespace@3..4
+                Integer@4..5
+                Whitespace@5..6
+                Integer@6..7
+                RightParenthesis@7..8
+            "#]],
+        );
+
+        check(
+            "'(1, 2, 3)",
+            expect![[r#"
+                SingleQuote@0..1
+                LeftParenthesis@1..2
+                Integer@2..3
+                Whitespace@3..5
+                Integer@5..6
+                Whitespace@6..8
+                Integer@8..9
+                RightParenthesis@9..10
+            "#]],
+        );
+
+        check(
+            "[1 2 3]",
+            expect![[r#"
+                LeftBracket@0..1
+                Integer@1..2
+                Whitespace@2..3
+                Integer@3..4
+                Whitespace@4..5
+                Integer@5..6
+                RightBracket@6..7
+            "#]],
+        );
+
+        check(
+            "[1, 2, 3]",
+            expect![[r#"
+                LeftBracket@0..1
+                Integer@1..2
+                Whitespace@2..4
+                Integer@4..5
+                Whitespace@5..7
+                Integer@7..8
+                RightBracket@8..9
+            "#]],
+        );
+
+        check(
+            "#{1 2 3}",
+            expect![[r#"
+                Hash@0..1
+                LeftBrace@1..2
+                Integer@2..3
+                Whitespace@3..4
+                Integer@4..5
+                Whitespace@5..6
+                Integer@6..7
+                RightBrace@7..8
+            "#]],
+        );
+
+        check(
+            "#{1, 2, 3}",
+            expect![[r#"
+                Hash@0..1
+                LeftBrace@1..2
+                Integer@2..3
+                Whitespace@3..5
+                Integer@5..6
+                Whitespace@6..8
+                Integer@8..9
+                RightBrace@9..10
+            "#]],
+        );
+
+        check(
+            "{:a 1 :b 2]",
+            expect![[r#"
+                LeftBrace@0..1
+                Colon@1..2
+                Identifier@2..3
+                Whitespace@3..4
+                Integer@4..5
+                Whitespace@5..6
+                Colon@6..7
+                Identifier@7..8
+                Whitespace@8..9
+                Integer@9..10
+                RightBracket@10..11
+            "#]],
+        );
+
+        check(
+            "{:a 1, :b 2}",
+            expect![[r#"
+                LeftBrace@0..1
+                Colon@1..2
+                Identifier@2..3
+                Whitespace@3..4
+                Integer@4..5
+                Whitespace@5..7
+                Colon@7..8
+                Identifier@8..9
+                Whitespace@9..10
+                Integer@10..11
+                RightBrace@11..12
             "#]],
         );
     }
