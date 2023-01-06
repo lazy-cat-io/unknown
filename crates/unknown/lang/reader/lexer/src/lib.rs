@@ -23,6 +23,12 @@ enum LexerTokenKind {
     #[regex(r#"([-+]?[0-9]+)/([0-9]+)"#)]
     Ratio,
 
+    #[regex("[a-zA-Z_]+[/a-zA-Z0-9_]*")]
+    Symbol,
+
+    #[regex(":[a-zA-Z_]+[/a-zA-Z0-9_]*")]
+    Keyword,
+
     // TODO: [2022-12-27, Ilshat Sultanov] handle other whitespace characters
     #[regex(r#"[ ,\n]+"#)]
     Whitespace,
@@ -242,6 +248,46 @@ mod tests {
             "42/42",
             expect![[r#"
                 Ratio@0..5
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_symbol() {
+        check(
+            "foobar",
+            expect![[r#"
+                Symbol@0..6
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_symbol_qualified() {
+        check(
+            "foobar/baz",
+            expect![[r#"
+                Symbol@0..10
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_keyword() {
+        check(
+            ":foobar",
+            expect![[r#"
+                Keyword@0..7
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_keyword_qualified() {
+        check(
+            ":foobar/baz",
+            expect![[r#"
+                Keyword@0..11
             "#]],
         );
     }

@@ -22,6 +22,8 @@ pub enum TokenKind {
     Integer,
     Float,
     Ratio,
+    Symbol,
+    Keyword,
 
     Whitespace,
     SingleQuote,
