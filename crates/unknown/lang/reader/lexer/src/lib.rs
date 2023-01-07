@@ -11,11 +11,11 @@ enum LexerTokenKind {
     #[token("nil")]
     Nil,
 
-    #[regex(r#"true|false"#)]
+    #[regex(r#"(true|false)"#)]
     Boolean,
 
-    // TODO: [2023-01-06, Ilshat Sultanov] handle 2r101010, 052, 8r52, 0x2a, 36r16, and 42
-    #[regex(r#"-?[0-9]+"#)]
+    // TODO: [2023-01-06, Ilshat Sultanov] handle 2r101010, 052, 8r52, 0x2a, 36r16
+    #[regex(r#"-?\d+N?"#)]
     Integer,
 
     // TODO: [2023-01-06, Ilshat Sultanov] handle `M` suffix to support BigDecimals
@@ -25,14 +25,24 @@ enum LexerTokenKind {
     #[regex(r#"([-+]?[0-9]+)/([0-9]+)"#)]
     Ratio,
 
+    #[regex(r#"##(-?Inf|NaN)"#)]
+    SymbolicValue,
+
+    #[regex(r#"#[a-zA-Z._+]+[/a-zA-Z0-9._+]*"#)]
+    TaggedLiteral,
+
     // TODO: [2023-01-06, Ilshat Sultanov] handle other cases
     #[regex(r#"\\(newline|space|tab|backspace|formfeed|return|.)"#)]
     #[regex(r#"\\u[0-9a-fA-F][0-9a-fA-F][0-9a-fA-F][0-9a-fA-F]"#)]
     #[regex(r#"\\o([0-7]|([0-7][0-7])|([0-3][0-7][0-7]))"#)]
     Character,
 
-    #[regex("[a-zA-Z._+]+[/a-zA-Z0-9._+]*")]
-    Identifier,
+    // TODO: [2023-01-07, Ilshat Sultanov] handle namespace and name with groups
+    #[regex(r#"[a-zA-Z._\+\?]+[/a-zA-Z0-9._\+\?\-!]*"#)]
+    Symbol,
+
+    #[regex(r#"::?[a-zA-Z._\+\?]+[/a-zA-Z0-9._\+\?\-!]*"#)]
+    Keyword,
 
     // TODO: [2022-12-27, Ilshat Sultanov] handle other whitespace characters
     #[regex(r#"[ ,\n]+"#)]
@@ -41,8 +51,35 @@ enum LexerTokenKind {
     #[token(":")]
     Colon,
 
+    #[token("^")]
+    Caret,
+
+    #[token("*")]
+    Asterisk,
+
+    #[token("&")]
+    Ampersand,
+
+    #[token("_")]
+    Underscore,
+
+    #[token("%")]
+    Percent,
+
+    #[token("@")]
+    Deref,
+
     #[token("#")]
     Hash,
+
+    #[token("#_")]
+    Discard,
+
+    #[token("#?")]
+    ReaderConditional,
+
+    #[token("#?@")]
+    ReaderConditionalSplicing,
 
     #[token("(")]
     LeftParenthesis,
@@ -66,6 +103,19 @@ enum LexerTokenKind {
     SingleQuote,
 
     _DoubleQuote,
+
+    #[token("`")]
+    SyntaxQuote,
+
+    #[token("#'")]
+    VarQuote,
+
+    #[token("~")]
+    Unquote,
+
+    #[token("~@")]
+    UnquoteSplicing,
+
     _Escape,
     _StringContent,
 
@@ -288,7 +338,35 @@ mod tests {
         check(
             "foobar",
             expect![[r#"
-                Identifier@0..6
+                Symbol@0..6
+            "#]],
+        );
+
+        check(
+            "foo-bar",
+            expect![[r#"
+                Symbol@0..7
+            "#]],
+        );
+
+        check(
+            "foobar?",
+            expect![[r#"
+                Symbol@0..7
+            "#]],
+        );
+
+        check(
+            "foobar!",
+            expect![[r#"
+                Symbol@0..7
+            "#]],
+        );
+
+        check(
+            "_foobar",
+            expect![[r#"
+                Symbol@0..7
             "#]],
         );
     }
@@ -298,7 +376,21 @@ mod tests {
         check(
             "foobar/baz",
             expect![[r#"
-                Identifier@0..10
+                Symbol@0..10
+            "#]],
+        );
+
+        check(
+            "foobar/baz?",
+            expect![[r#"
+                Symbol@0..11
+            "#]],
+        );
+
+        check(
+            "foobar/baz!",
+            expect![[r#"
+                Symbol@0..11
             "#]],
         );
     }
@@ -322,12 +414,73 @@ mod tests {
             "#]],
         );
     }
+
+    #[test]
+    fn lex_caret() {
+        check(
+            "^",
+            expect![[r#"
+                Caret@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_asterisk() {
+        check(
+            "*",
+            expect![[r#"
+                Asterisk@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_ampersand() {
+        check(
+            "&",
+            expect![[r#"
+                Ampersand@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_underscore() {
+        check(
+            "_",
+            expect![[r#"
+                Underscore@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_percent() {
+        check(
+            "%",
+            expect![[r#"
+                Percent@0..1
+            "#]],
+        );
+    }
+
     #[test]
     fn lex_hash() {
         check(
             "#",
             expect![[r#"
                 Hash@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_discard() {
+        check(
+            "#_",
+            expect![[r#"
+                Discard@0..2
             "#]],
         );
     }
@@ -388,6 +541,56 @@ mod tests {
             "}",
             expect![[r#"
                 RightBrace@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_single_quote() {
+        check(
+            "'",
+            expect![[r#"
+                SingleQuote@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_double_quote() {
+        check(
+            "\"",
+            expect![[r#"
+                DoubleQuote@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_syntax_quote() {
+        check(
+            "`",
+            expect![[r#"
+                SyntaxQuote@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_unquote() {
+        check(
+            "~",
+            expect![[r#"
+                Unquote@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_unquote_splicing() {
+        check(
+            "~@",
+            expect![[r#"
+                UnquoteSplicing@0..2
             "#]],
         );
     }
@@ -573,21 +776,21 @@ mod tests {
         check(
             "map",
             expect![[r#"
-                Identifier@0..3
+                Symbol@0..3
             "#]],
         );
 
         check(
             "+",
             expect![[r#"
-                Identifier@0..1
+                Symbol@0..1
             "#]],
         );
 
         check(
             "clojure.core/+",
             expect![[r#"
-                Identifier@0..14
+                Symbol@0..14
             "#]],
         );
 
@@ -610,16 +813,14 @@ mod tests {
         check(
             ":alpha",
             expect![[r#"
-                Colon@0..1
-                Identifier@1..6
+                Keyword@0..6
             "#]],
         );
 
         check(
             ":release/alpha",
             expect![[r#"
-                Colon@0..1
-                Identifier@1..14
+                Keyword@0..14
             "#]],
         );
     }
@@ -712,13 +913,11 @@ mod tests {
             "{:a 1 :b 2]",
             expect![[r#"
                 LeftBrace@0..1
-                Colon@1..2
-                Identifier@2..3
+                Keyword@1..3
                 Whitespace@3..4
                 Integer@4..5
                 Whitespace@5..6
-                Colon@6..7
-                Identifier@7..8
+                Keyword@6..8
                 Whitespace@8..9
                 Integer@9..10
                 RightBracket@10..11
@@ -729,16 +928,329 @@ mod tests {
             "{:a 1, :b 2}",
             expect![[r#"
                 LeftBrace@0..1
-                Colon@1..2
-                Identifier@2..3
+                Keyword@1..3
                 Whitespace@3..4
                 Integer@4..5
                 Whitespace@5..7
-                Colon@7..8
-                Identifier@8..9
+                Keyword@7..9
                 Whitespace@9..10
                 Integer@10..11
                 RightBrace@11..12
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_empty_list() {
+        check(
+            "'()",
+            expect![[r#"
+                SingleQuote@0..1
+                LeftParenthesis@1..2
+                RightParenthesis@2..3
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_empty_vector() {
+        check(
+            "[]",
+            expect![[r#"
+                LeftBracket@0..1
+                RightBracket@1..2
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_empty_map() {
+        check(
+            "{}",
+            expect![[r#"
+                LeftBrace@0..1
+                RightBrace@1..2
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_dispatch_character() {
+        check(
+            "#",
+            expect![[r#"
+                Hash@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_empty_set() {
+        check(
+            "#{}",
+            expect![[r#"
+                Hash@0..1
+                LeftBrace@1..2
+                RightBrace@2..3
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_ignore_the_next_form() {
+        check(
+            "#_",
+            expect![[r#"
+                Discard@0..2
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_empty_regex() {
+        check(
+            "#\"\"",
+            expect![[r#"
+                Hash@0..1
+                DoubleQuote@1..2
+                DoubleQuote@2..3
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_anonymous_function() {
+        check(
+            "#()",
+            expect![[r#"
+                Hash@0..1
+                LeftParenthesis@1..2
+                RightParenthesis@2..3
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_var_quote() {
+        check(
+            "#'",
+            expect![[r#"
+                VarQuote@0..2
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_symbolic_values() {
+        check(
+            "##Inf",
+            expect![[r#"
+                SymbolicValue@0..5
+            "#]],
+        );
+
+        check(
+            "##-Inf",
+            expect![[r#"
+                SymbolicValue@0..6
+            "#]],
+        );
+
+        check(
+            "##NaN",
+            expect![[r#"
+                SymbolicValue@0..5
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_tagged_literals() {
+        check(
+            "#uuid",
+            expect![[r#"
+                TaggedLiteral@0..5
+            "#]],
+        );
+
+        check(
+            "#inst",
+            expect![[r#"
+                TaggedLiteral@0..5
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_anonymous_function_arguments() {
+        check(
+            "%",
+            expect![[r#"
+                Percent@0..1
+            "#]],
+        );
+
+        check(
+            "%1",
+            expect![[r#"
+                Percent@0..1
+                Integer@1..2
+            "#]],
+        );
+
+        check(
+            "%2",
+            expect![[r#"
+                Percent@0..1
+                Integer@1..2
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_deref() {
+        check(
+            "@",
+            expect![[r#"
+                Deref@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_metadata() {
+        check(
+            "^{}",
+            expect![[r#"
+                Caret@0..1
+                LeftBrace@1..2
+                RightBrace@2..3
+            "#]],
+        );
+
+        check(
+            "^:private",
+            expect![[r#"
+                Caret@0..1
+                Keyword@1..9
+            "#]],
+        );
+
+        check(
+            "^{:private true}",
+            expect![[r#"
+                Caret@0..1
+                LeftBrace@1..2
+                Keyword@2..10
+                Whitespace@10..11
+                Boolean@11..15
+                RightBrace@15..16
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_quote() {
+        check(
+            "'",
+            expect![[r#"
+                SingleQuote@0..1
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_comment() {
+        check(
+            "; ignore me",
+            expect![[r#"
+                CommentLine@0..1
+                CommentContent@1..11
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_keyword() {
+        check(
+            ":keyword",
+            expect![[r#"
+                Keyword@0..8
+            "#]],
+        );
+
+        check(
+            "::keyword",
+            expect![[r#"
+                Keyword@0..9
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_map_namespaced() {
+        check(
+            "#:person{:age 42}",
+            expect![[r#"
+                Hash@0..1
+                Keyword@1..8
+                LeftBrace@8..9
+                Keyword@9..13
+                Whitespace@13..14
+                Integer@14..16
+                RightBrace@16..17
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_symbol_gensym() {
+        check(
+            "foobar#",
+            expect![[r#"
+                Symbol@0..6
+                Hash@6..7
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_reader_conditional() {
+        check(
+            "#?(:clj 42)",
+            expect![[r#"
+                ReaderConditional@0..2
+                LeftParenthesis@2..3
+                Keyword@3..7
+                Whitespace@7..8
+                Integer@8..10
+                RightParenthesis@10..11
+            "#]],
+        );
+
+        check(
+            "#?@(:clj [42])",
+            expect![[r#"
+                ReaderConditionalSplicing@0..3
+                LeftParenthesis@3..4
+                Keyword@4..8
+                Whitespace@8..9
+                LeftBracket@9..10
+                Integer@10..12
+                RightBracket@12..13
+                RightParenthesis@13..14
+            "#]],
+        );
+    }
+
+    #[test]
+    fn lex_earmuffs() {
+        check(
+            "*foo*",
+            expect![[r#"
+                Asterisk@0..1
+                Symbol@1..4
+                Asterisk@4..5
             "#]],
         );
     }
